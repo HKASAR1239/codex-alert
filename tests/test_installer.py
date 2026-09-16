@@ -98,11 +98,18 @@ class InstallerTests(unittest.TestCase):
         self.existing_installation()
         manage.install(self.home, self.plist, self.args)
         self.assertEqual(self.events, ["compile", "stop", "start"])
-        self.assertEqual(json.loads((self.home / "config.json").read_text()), self.config)
+        self.assertEqual(json.loads((self.home / "config.json").read_text()),
+                         dict(self.config, include_task_name=True))
         self.assertEqual((self.home / "bin/codex-flash").read_text(), "compiled helper\n")
         self.assertTrue((self.home / "app/codex_alert/__init__.py").exists())
         self.assertFalse((self.home / "app/old-app-marker").exists())
         self.assertNotIn(self.config["phone"]["topic"], self.output.getvalue())
+
+    def test_upgrade_preserves_disabled_task_names(self):
+        self.config["include_task_name"] = False
+        self.existing_installation()
+        manage.install(self.home, self.plist, self.args)
+        self.assertEqual(json.loads((self.home / "config.json").read_text()), self.config)
 
     def test_failed_compile_does_not_stop_or_change_existing_installation(self):
         old_config, old_plist = self.existing_installation()

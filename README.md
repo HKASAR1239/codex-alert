@@ -1,6 +1,6 @@
 # Codex Alert
 
-Get an [ntfy](https://ntfy.sh/) notification on your phone and a gentle Mac screen flash when a local Codex task finishes after **more than 2 minutes**. Works in the background and starts at login.
+Get an [ntfy](https://ntfy.sh/) notification with the **task name and duration**, plus a gentle Mac screen flash, when a local Codex task finishes after **more than 2 minutes**. Works in the background and starts at login.
 
 ![Illustrated preview of turquoise Mac screen edges and a phone completion notification](docs/assets/preview.png)
 *Illustrated preview.*
@@ -14,7 +14,7 @@ Requires **macOS 13+, Python 3.9+ and Xcode Command Line Tools** (`xcode-select 
 3. Double-click **`install.command`** on your Mac.
 4. In ntfy, subscribe to the topic shown by the installer on **`https://ntfy.sh`**. Press Return on your Mac to send a test.
 
-Keep your Mac awake and online. Keep the topic private: anyone who knows it can read and send alerts. Only a generic message and task duration are sent.
+Keep your Mac awake and online. Keep the topic private: anyone who knows it can read and send alerts. The conversation name and duration are sent to ntfy and may appear on your lock screen.
 
 **Uninstall:** run `bash install.command uninstall` from the downloaded folder.
 

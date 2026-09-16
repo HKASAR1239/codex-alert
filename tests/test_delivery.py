@@ -46,6 +46,17 @@ class PhoneDeliveryTests(unittest.TestCase):
         self.assertEqual(request.data, message.encode("utf-8"))
         self.assertEqual(call.kwargs["timeout"], 15)
 
+    def test_named_task_unicode_and_duration_reach_ntfy_body(self):
+        message = alert.message_for(125.9, "Réviser café — 日本語 👩‍💻")
+        expected = "Réviser café — 日本語 👩‍💻\nCompleted in 2 min 05 s."
+        self.assertEqual(message, expected)
+        self.reply({"event": "message", "id": "accepted", "topic": TOPIC, "message": expected})
+        self.assertTrue(alert.send_phone(PHONE, message))
+        request = self.build_opener.return_value.open.call_args.args[0]
+        self.assertEqual(request.data, expected.encode("utf-8"))
+        # Unicode task names belong in the UTF-8 body, not HTTP headers.
+        self.assertEqual(request.get_header("Title"), "Codex task complete")
+
     def test_disabled_phone_makes_no_request(self):
         self.assertFalse(alert.send_phone({"provider": "none"}, "message"))
         self.build_opener.assert_not_called()
@@ -137,6 +148,112 @@ class LocalRuntimeTests(unittest.TestCase):
         self.assertEqual(state["pending"][0]["phone_destination"], alert.destination_id(PHONE))
         self.assertNotIn(TOPIC, json.dumps(state))
 
+    def test_drain_resolves_matching_threads_without_persisting_or_logging_names(self):
+        metadata = self.home / "synthetic-codex"
+        metadata.mkdir()
+        names = {"thread-one": "Synthetic café review 👩‍💻", "thread-two": "Synthetic 日本語 report"}
+        (metadata / "session_index.jsonl").write_text("".join(
+            json.dumps({"id": thread_id, "thread_name": name}) + "\n"
+            for thread_id, name in names.items()), encoding="utf-8")
+        resolver = alert.TitleResolver(metadata)
+        state = {}
+        alert.enqueue(state, [
+            {"thread_id": "thread-two", "turn_id": "turn-two", "seconds": 181},
+            {"thread_id": "thread-one", "turn_id": "turn-one", "seconds": 125},
+        ], self.config)
+        snapshots = [json.dumps(state, ensure_ascii=False)]
+        original_save = alert.save_json
+
+        def capture_save(path, value):
+            snapshots.append(json.dumps(value, ensure_ascii=False))
+            original_save(path, value)
+
+        with mock.patch.object(alert, "save_json", side_effect=capture_save), self.assertLogs(level="INFO") as logs:
+            alert.drain(self.home, state, self.config, resolver)
+        self.assertEqual(self.phone.call_args_list, [
+            mock.call(PHONE, "Synthetic 日本語 report\nCompleted in 3 min 01 s."),
+            mock.call(PHONE, "Synthetic café review 👩‍💻\nCompleted in 2 min 05 s."),
+        ])
+        self.assertEqual(state["pending"], [])
+        snapshots.append((self.home / "state.json").read_text(encoding="utf-8"))
+        for name in names.values():
+            self.assertNotIn(name, "\n".join(snapshots))
+            self.assertNotIn(name, "\n".join(logs.output))
+
+    def test_drain_uses_generic_message_when_name_is_missing_or_lookup_fails(self):
+        for lookup in (None, RuntimeError("synthetic private task name")):
+            with self.subTest(lookup=type(lookup).__name__):
+                resolver = mock.Mock(spec=alert.TitleResolver)
+                if isinstance(lookup, Exception):
+                    resolver.resolve.side_effect = lookup
+                else:
+                    resolver.resolve.return_value = lookup
+                self.phone.reset_mock()
+                state = self.queued(thread_id="missing-thread")
+                with self.assertLogs(level="INFO") as logs:
+                    alert.drain(self.home, state, self.config, resolver)
+                resolver.resolve.assert_called_once_with("missing-thread")
+                self.phone.assert_called_once_with(
+                    PHONE, "Codex task complete — 2 min 05 s. Your Mac is ready.")
+                self.assertEqual(state["pending"], [])
+                self.assertNotIn("synthetic private task name", "\n".join(logs.output))
+
+    def test_missing_metadata_files_fall_back_without_creating_a_database(self):
+        metadata = self.home / "absent-codex"
+        state = self.queued(thread_id="unknown-thread")
+        alert.drain(self.home, state, self.config, alert.TitleResolver(metadata))
+        self.phone.assert_called_once_with(
+            PHONE, "Codex task complete — 2 min 05 s. Your Mac is ready.")
+        self.assertFalse(metadata.exists())
+        self.assertEqual(state["pending"], [])
+
+    def test_disabling_task_names_skips_metadata_lookup(self):
+        resolver = mock.Mock(spec=alert.TitleResolver)
+        resolver.resolve.side_effect = AssertionError("Task names disabled: do not inspect metadata")
+        state = self.queued(thread_id="example-thread")
+        alert.drain(self.home, state, dict(self.config, include_task_name=False), resolver)
+        resolver.resolve.assert_not_called()
+        self.phone.assert_called_once_with(
+            PHONE, "Codex task complete — 2 min 05 s. Your Mac is ready.")
+
+    def test_retry_refreshes_renamed_task_without_saving_names_or_logging_errors(self):
+        metadata = self.home / "synthetic-codex"
+        metadata.mkdir()
+        index = metadata / "session_index.jsonl"
+        old_name = "Synthetic private draft α"
+        new_name = "Synthetic renamed review β"
+        index.write_text(json.dumps({"id": "example-thread", "thread_name": old_name}) + "\n",
+                         encoding="utf-8")
+        resolver = alert.TitleResolver(metadata)
+        state = self.queued(thread_id="example-thread")
+        self.phone.side_effect = RuntimeError(old_name)
+        with mock.patch.object(alert.time, "time", return_value=100), self.assertLogs(level="WARNING") as logs:
+            alert.drain(self.home, state, self.config, resolver)
+        self.phone.assert_called_once_with(PHONE, old_name + "\nCompleted in 2 min 05 s.")
+        persisted = (self.home / "state.json").read_text(encoding="utf-8")
+        self.assertNotIn(old_name, persisted)
+        self.assertNotIn(old_name, "\n".join(logs.output))
+        restarted = json.loads(persisted)
+        self.assertEqual(restarted["pending"][0]["attempts"], 1)
+        with index.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"id": "example-thread", "thread_name": new_name}) + "\n")
+        self.phone.reset_mock(side_effect=True)
+        with mock.patch.object(alert.time, "time", return_value=161), self.assertLogs(level="INFO") as retry_logs:
+            alert.drain(self.home, restarted, self.config, resolver)
+        self.phone.assert_called_once_with(PHONE, new_name + "\nCompleted in 2 min 05 s.")
+        self.assertEqual(restarted["pending"], [])
+        for name in (old_name, new_name):
+            self.assertNotIn(name, (self.home / "state.json").read_text(encoding="utf-8"))
+            self.assertNotIn(name, "\n".join(retry_logs.output))
+
+    def test_task_name_lookup_is_deferred_until_phone_retry_is_due(self):
+        resolver = mock.Mock(spec=alert.TitleResolver)
+        state = self.queued(thread_id="example-thread", local_done=True, retry_at=160)
+        with mock.patch.object(alert.time, "time", return_value=159):
+            alert.drain(self.home, state, self.config, resolver)
+        resolver.resolve.assert_not_called()
+        self.phone.assert_not_called()
+
     def test_phone_is_attempted_and_saved_when_flash_fails(self):
         state = self.queued()
         self.flash.side_effect = subprocess.CalledProcessError(1, "helper")
@@ -220,12 +337,18 @@ class LocalRuntimeTests(unittest.TestCase):
         for field, value in (
             ("min_seconds", True), ("min_seconds", -1), ("min_seconds", float("nan")),
             ("min_seconds", float("inf")), ("poll_seconds", 0), ("poll_seconds", 61),
-            ("flash", "yes"), ("phone", []),
+            ("flash", "yes"), ("phone", []), ("include_task_name", "yes"),
+            ("include_task_name", None),
         ):
             with self.subTest(field=field, value=value):
                 alert.save_json(self.home / "config.json", {field: value})
                 with self.assertRaises(alert.AlertError):
                     alert.config_for(self.home)
+
+    def test_task_name_setting_defaults_on_and_preserves_explicit_opt_out(self):
+        self.assertTrue(alert.config_for(self.home)["include_task_name"])
+        alert.save_json(self.home / "config.json", dict(self.config, include_task_name=False))
+        self.assertFalse(alert.config_for(self.home)["include_task_name"])
 
     def test_setup_refuses_redirected_input_or_output_without_exposing_topic(self):
         alert.save_json(self.home / "config.json", self.config)

@@ -21,6 +21,7 @@ import urllib.error
 import urllib.request
 
 from .watcher import Watcher
+from .titles import TitleResolver, sanitize_title
 
 
 DEFAULT_HOME = Path.home() / "Library/Application Support/CodexAlert"
@@ -28,6 +29,7 @@ DEFAULT_CONFIG = {
     "min_seconds": 120,
     "poll_seconds": 3,
     "flash": True,
+    "include_task_name": True,
     "phone": {"provider": "none"},
 }
 NTFY_SERVER = "https://ntfy.sh"
@@ -95,6 +97,9 @@ def config_for(home: Path, *, reset_invalid_phone: bool = False) -> dict:
     config["flash"] = raw.get("flash", True)
     if not isinstance(config["flash"], bool):
         raise AlertError("Invalid configuration field: flash")
+    config["include_task_name"] = raw.get("include_task_name", True)
+    if not isinstance(config["include_task_name"], bool):
+        raise AlertError("Invalid configuration field: include_task_name")
     try:
         config["phone"] = clean_phone(raw.get("phone", {"provider": "none"}))
     except AlertError:
@@ -105,8 +110,11 @@ def config_for(home: Path, *, reset_invalid_phone: bool = False) -> dict:
     return config
 
 
-def message_for(seconds: float) -> str:
+def message_for(seconds: float, task_name: str | None = None) -> str:
     minutes, remainder = divmod(max(0, int(seconds)), 60)
+    task_name = sanitize_title(task_name)
+    if task_name:
+        return f"{task_name}\nCompleted in {minutes} min {remainder:02d} s."
     return f"Codex task complete — {minutes} min {remainder:02d} s. Your Mac is ready."
 
 
@@ -116,7 +124,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def send_phone(phone: dict, message: str) -> bool:
-    """Send a generic message; never propagate a URL, body or error chain."""
+    """Send an alert; never propagate a URL, body or error chain."""
     phone = clean_phone(phone)
     if phone["provider"] == "none":
         return False
@@ -177,7 +185,7 @@ def flash(home: Path) -> None:
                    timeout=10, check=True)
 
 
-def drain(home: Path, state: dict, config: dict) -> None:
+def drain(home: Path, state: dict, config: dict, titles: TitleResolver | None = None) -> None:
     pending = state.setdefault("pending", [])
     destination = destination_id(config["phone"])
     for item in list(pending):
@@ -198,7 +206,14 @@ def drain(home: Path, state: dict, config: dict) -> None:
                 logging.info("Discarded an alert for a previous phone configuration.")
             elif time.time() >= item.get("retry_at", 0):
                 try:
-                    send_phone(config["phone"], message_for(item["seconds"]))
+                    task_name = None
+                    if config.get("include_task_name", True) and titles is not None:
+                        try:
+                            task_name = titles.resolve(item.get("thread_id"))
+                        except Exception:
+                            # Missing or changed Codex metadata never blocks delivery.
+                            pass
+                    send_phone(config["phone"], message_for(item["seconds"], task_name))
                     item["phone_done"] = True
                     logging.info("Notification accepted; task duration %.1f s.", item["seconds"])
                 except Exception:
@@ -226,6 +241,7 @@ def watch(home: Path, sessions: Path) -> None:
         state = read_json(home / "state.json", {})
         state.setdefault("activated_at", time.time())
         monitor = Watcher(sessions, state.setdefault("watcher", {}), state["activated_at"])
+        titles = TitleResolver(sessions.parent)
         save_json(home / "state.json", state)
         logging.info("Watcher started.")
         while True:
@@ -235,7 +251,7 @@ def watch(home: Path, sessions: Path) -> None:
                 enqueue(state, monitor.poll(), config)
                 state["heartbeat_at"] = time.time()
                 save_json(home / "state.json", state)
-                drain(home, state, config)
+                drain(home, state, config, titles)
                 time.sleep(config["poll_seconds"])
             except KeyboardInterrupt:
                 break
@@ -258,7 +274,9 @@ def configure_phone(home: Path) -> None:
     print("Allow notifications, then subscribe with these details:")
     print("Server: " + NTFY_SERVER + "\nTopic: " + phone["topic"])
     print("Keep this random topic private: anyone who knows it can read and send alerts.")
-    print("ntfy receives only a generic completion message and the task duration.")
+    print("ntfy receives the conversation name and duration; the name may appear on your lock screen."
+          if config["include_task_name"] else
+          "ntfy receives a generic completion message and the task duration.")
     input("Once subscribed, press Return to send a test notification: ")
     send_phone(phone, TEST_MESSAGE)
     config["phone"] = phone
@@ -287,6 +305,7 @@ def status_for(home: Path, sessions: Path) -> dict:
         "watcher": "active" if watcher_running(home) and 0 <= age < 60 else "inactive or waiting",
         "min_seconds": config["min_seconds"],
         "flash": config["flash"],
+        "include_task_name": config["include_task_name"],
         "phone": config["phone"]["provider"],
         "pending_alerts": len(state.get("pending", [])),
         "sessions_available": sessions.is_dir(),
@@ -315,6 +334,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Threshold: more than {status['min_seconds']:g} seconds")
                 print("Mac flash: " + ("on" if status["flash"] else "off"))
                 print("Phone: " + status["phone"])
+                print("Task names: " + ("on" if status["include_task_name"] else "off"))
                 print("Pending alerts: " + str(status["pending_alerts"]))
                 if not status["sessions_available"]:
                     print("No Codex sessions directory yet; run a Codex task first.")
