@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Codex Alert — desktop flash and phone notification</title>
+  <desc id="desc">Illustrated preview of a dark Mac desktop with a turquoise border flash and an iPhone receiving an ntfy notification when a Codex task finishes.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0E1B20"/><stop offset="1" stop-color="#081115"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#22393E"/><stop offset="1" stop-color="#112126"/></linearGradient>
+    <linearGradient id="phonebg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#2A464B"/><stop offset="1" stop-color="#122228"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#465054"/><stop offset="1" stop-color="#242D31"/></linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="160%"><feGaussianBlur stdDeviation="20"/></filter>
+    <filter id="glow" x="-10%" y="-20%" width="120%" height="140%"><feGaussianBlur stdDeviation="8"/></filter>
+    <clipPath id="screen"><rect x="115" y="350" width="954" height="413" rx="11"/></clipPath>
+    <clipPath id="phone"><rect x="1188" y="217" width="286" height="582" rx="41"/></clipPath>
+  </defs>
+  <rect width="1600" height="900" rx="28" fill="url(#bg)"/>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
+    <g transform="translate(94 69)">
+      <rect width="28" height="28" rx="8" fill="#61DFCB"/>
+      <path d="M8 14h4l2-7 3 14 2-7h3" fill="none" stroke="#103932" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="41" y="21" fill="#E4EDEB" font-size="22" font-weight="650" letter-spacing=".2">Codex Alert</text>
+    </g>
+    <text x="94" y="174" fill="#F1F5F3" font-size="62" font-weight="650" letter-spacing="-2.4">Keep working.</text>
+    <text x="94" y="244" fill="#F1F5F3" font-size="62" font-weight="650" letter-spacing="-2.4">Know when it’s done.</text>
+    <text x="98" y="288" fill="#91A8AC" font-size="20">A gentle flash on your Mac. An alert on your phone.</text>
+    <text x="1494" y="88" fill="#8BA0A4" font-size="15" letter-spacing="2" text-anchor="end">OPEN SOURCE · macOS</text>
+
+    <!-- An illustrative desktop, not a screenshot of a user's workspace. -->
+    <ellipse cx="592" cy="802" rx="495" ry="22" fill="#000" opacity=".25" filter="url(#shadow)"/>
+    <rect x="101" y="333" width="982" height="447" rx="22" fill="#03080A" stroke="#3A494E" stroke-width="2"/>
+    <rect x="115" y="350" width="954" height="413" rx="11" fill="url(#glass)"/>
+    <g clip-path="url(#screen)">
+      <rect x="115" y="350" width="954" height="32" fill="#12242A"/>
+      <circle cx="136" cy="366" r="4" fill="#A5BFC2"/>
+      <text x="153" y="372" fill="#B6C8CA" font-size="13" font-weight="600">Workspace</text>
+      <text x="1045" y="372" fill="#A7BEC1" font-size="12" text-anchor="end">9:41</text>
+      <rect x="149" y="407" width="885" height="308" rx="13" fill="#182A30" stroke="#43565B"/>
+      <path d="M162 407H1021Q1034 407 1034 420V447H149V420Q149 407 162 407Z" fill="#23383E"/>
+      <circle cx="169" cy="427" r="5" fill="#8A6260"/>
+      <circle cx="187" cy="427" r="5" fill="#938967"/>
+      <circle cx="205" cy="427" r="5" fill="#608879"/>
+      <text x="590" y="432" fill="#A3BBC0" font-size="12" text-anchor="middle" letter-spacing=".5">YOUR WORKSPACE</text>
+      <path d="M332 447V715" stroke="#31464D"/>
+      <text x="172" y="483" fill="#6F9199" font-size="11" font-weight="600" letter-spacing="1.7">NOTES</text>
+      <rect x="162" y="499" width="157" height="34" rx="6" fill="#2B464D"/>
+      <rect x="174" y="510" width="12" height="13" rx="2" fill="none" stroke="#81A4AA"/>
+      <text x="197" y="521" fill="#C8D8DA" font-size="13">Next idea</text>
+      <rect x="174" y="549" width="12" height="13" rx="2" fill="none" stroke="#577981"/>
+      <text x="197" y="560" fill="#74949B" font-size="13">Sketches</text>
+      <rect x="174" y="588" width="12" height="13" rx="2" fill="none" stroke="#577981"/>
+      <text x="197" y="599" fill="#74949B" font-size="13">References</text>
+      <text x="373" y="496" fill="#75979E" font-size="12" letter-spacing="1.4">NEXT IDEA</text>
+      <text x="373" y="539" fill="#DCE7E7" font-size="30" font-weight="600" letter-spacing="-.7">Stay in your flow.</text>
+      <rect x="374" y="563" width="400" height="7" rx="3.5" fill="#42616A"/>
+      <rect x="374" y="583" width="342" height="7" rx="3.5" fill="#344E56"/>
+      <rect x="374" y="622" width="263" height="7" rx="3.5" fill="#344E56"/>
+      <rect x="374" y="642" width="312" height="7" rx="3.5" fill="#344E56"/>
+      <rect x="374" y="662" width="205" height="7" rx="3.5" fill="#344E56"/>
+    </g>
+    <!-- Soft turquoise edge flash. -->
+    <rect x="117" y="352" width="950" height="409" rx="10" fill="none" stroke="#61F2D9" stroke-width="10" opacity=".5" filter="url(#glow)"/>
+    <rect x="118" y="353" width="948" height="407" rx="9" fill="none" stroke="#78EFDA" stroke-width="3"/>
+    <path d="M65 780H1119L1107 792Q1101 797 1087 797H97Q83 797 77 792Z" fill="url(#metal)" stroke="#4D595D" stroke-width="1"/>
+    <path d="M508 780H676L665 786H519Z" fill="#111B20"/>
+
+    <!-- Illustrated iPhone with a generic ntfy lock-screen alert. -->
+    <rect x="1173" y="206" width="315" height="610" rx="58" fill="#000" opacity=".45" filter="url(#shadow)"/>
+    <rect x="1177" y="205" width="309" height="606" rx="53" fill="#0B1216" stroke="#4A5B60" stroke-width="2"/>
+    <rect x="1188" y="217" width="286" height="582" rx="41" fill="url(#phonebg)"/>
+    <g clip-path="url(#phone)">
+      <circle cx="1456" cy="721" r="194" fill="#29565A" opacity=".34"/>
+      <circle cx="1202" cy="771" r="201" fill="#315459" opacity=".31"/>
+      <path d="M1242 232H1420V248Q1420 264 1404 264H1258Q1242 264 1242 248Z" fill="#0B1216"/>
+      <circle cx="1410" cy="239" r="3" fill="#26383F"/>
+      <path d="M1319 293v-5a12 12 0 0 1 24 0v5" fill="none" stroke="#BDD8D7" stroke-width="3"/>
+      <rect x="1316" y="291" width="30" height="22" rx="5" fill="#BDD8D7"/>
+      <text x="1331" y="388" fill="#DCEDE9" text-anchor="middle" font-size="77" font-weight="300" letter-spacing="-3">9:41</text>
+      <text x="1331" y="421" fill="#B7D3D2" text-anchor="middle" font-size="17">Your task is ready.</text>
+      <rect x="1202" y="459" width="258" height="118" rx="20" fill="#DDEAE8" opacity=".94"/>
+      <rect x="1217" y="474" width="23" height="23" rx="6" fill="#347467"/>
+      <path d="M1222 480h13v10h-6l-4 3v-3h-3Z" fill="none" stroke="#FFF" stroke-width="1.5" stroke-linejoin="round"/>
+      <text x="1249" y="491" fill="#43605C" font-size="13" font-weight="600">ntfy</text>
+      <text x="1445" y="491" fill="#6B807C" font-size="12" text-anchor="end">now</text>
+      <text x="1217" y="522" fill="#18342E" font-size="18" font-weight="700">Codex task complete</text>
+      <text x="1217" y="548" fill="#35534C" font-size="14">4 min 12 s. Your Mac is ready.</text>
+      <rect x="1279" y="785" width="104" height="4" rx="2" fill="#ACCCC9" opacity=".7"/>
+    </g>
+    <path d="M1174 310v39m0 13v39m315-71v67" stroke="#3C4C51" stroke-width="3" stroke-linecap="round"/>
+
+    <circle cx="99" cy="849" r="4" fill="#61DFCB"/>
+    <text x="114" y="855" fill="#95ADB0" font-size="16">Desktop flash + phone notification</text>
+    <text x="1494" y="855" fill="#627F86" font-size="13" text-anchor="end">Illustrated preview</text>
+  </g>
+</svg>

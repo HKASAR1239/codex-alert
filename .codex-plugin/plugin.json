@@ -1,0 +1,30 @@
+{
+  "name": "codex-alert",
+  "version": "0.1.0",
+  "description": "Mac screen pulses and phone notifications when a local Codex task finishes.",
+  "author": {
+    "name": "HKASAR1239",
+    "url": "https://github.com/HKASAR1239"
+  },
+  "homepage": "https://github.com/HKASAR1239/codex-alert#readme",
+  "repository": "https://github.com/HKASAR1239/codex-alert",
+  "license": "MIT",
+  "keywords": ["codex", "macos", "notifications", "ntfy"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Alert",
+    "shortDescription": "Know when your long Codex task is done.",
+    "longDescription": "Set up and manage a local macOS companion that pulses the screen edges and sends optional ntfy phone notifications after Codex tasks longer than two minutes. The background service requires running the included installer.",
+    "developerName": "HKASAR1239",
+    "category": "Productivity",
+    "capabilities": ["Interactive"],
+    "websiteURL": "https://github.com/HKASAR1239/codex-alert",
+    "privacyPolicyURL": "https://github.com/HKASAR1239/codex-alert/blob/main/PRIVACY.md",
+    "brandColor": "#40E0D0",
+    "defaultPrompt": [
+      "Help me set up Codex Alert on my Mac.",
+      "Check whether Codex Alert is running.",
+      "Help me turn off phone notifications."
+    ]
+  }
+}
