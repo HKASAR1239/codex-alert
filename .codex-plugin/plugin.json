@@ -1,6 +1,6 @@
 {
   "name": "codex-alert",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Mac screen pulses and phone notifications when a local Codex task finishes.",
   "author": {
     "name": "HKASAR1239",
@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "Codex Alert",
     "shortDescription": "Know when your long Codex task is done.",
-    "longDescription": "Set up and manage a local macOS companion that pulses the screen edges and sends optional ntfy phone notifications after Codex tasks longer than two minutes. The background service requires running the included installer.",
+    "longDescription": "Set up and manage the Codex Alert menu-bar app: ntfy completion and failure alerts, screen flashes, quiet hours and screen-off operation. Optional approval alerts use separately reviewed Codex hooks. Install the Mac app from Releases or use the source installer.",
     "developerName": "HKASAR1239",
     "category": "Productivity",
     "capabilities": ["Interactive"],

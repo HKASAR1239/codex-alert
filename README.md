@@ -1,23 +1,29 @@
 # Codex Alert
 
-Get an [ntfy](https://ntfy.sh/) notification with the **task name and duration**, plus a gentle Mac screen flash, when a local Codex task finishes after **more than 2 minutes**. Works in the background and starts at login.
+A small Mac menu-bar app that sends [ntfy](https://ntfy.sh/) phone alerts when your Codex tasks finish. See the **task name and duration**, get a gentle screen flash, and let tasks run with your screen off.
 
-![Illustrated preview of turquoise Mac screen edges and a phone completion notification](docs/assets/preview.png)
+![Illustrated Codex Alert preview](docs/assets/preview.png)
 *Illustrated preview.*
 
 ## Setup
 
-Requires **macOS 13+, Python 3.9+ and Xcode Command Line Tools** (`xcode-select --install`).
+1. [Download the app](https://github.com/HKASAR1239/codex-alert/releases/latest) for **Apple silicon** or **Intel**, then unzip it.
+2. Open **Codex Alert.app** and choose **Set up Codex Alert**. No Python or developer tools needed.
+3. Choose **Connect phone**, install ntfy on [iPhone](https://apps.apple.com/app/ntfy/id1625396347) or [Android](https://docs.ntfy.sh/subscribe/phone/), subscribe to the private topic shown, and send a test.
 
-1. [Download the ZIP](https://github.com/HKASAR1239/codex-alert/archive/refs/heads/main.zip) and unzip it.
-2. Install ntfy on [iPhone](https://apps.apple.com/app/ntfy/id1625396347) or [Android](https://docs.ntfy.sh/subscribe/phone/) and allow notifications.
-3. Double-click **`install.command`** on your Mac.
-4. In ntfy, subscribe to the topic shown by the installer on **`https://ntfy.sh`**. Press Return on your Mac to send a test.
+The app installs into your user Applications folder. Builds are currently **not notarized**; macOS may require [Open Anyway in Privacy & Security](https://support.apple.com/en-us/102445). Check the release for the minimum macOS version.
 
-The screen can turn off or lock: Codex Alert prevents idle sleep during detected tasks while plugged in. For battery use too: `bash install.command power-mode --mode always` (uses more battery). Disable with `--mode off`. Keep the Mac online and its lid open; manual sleep and shutdown suspend local tasks. Protection ends after completion or 2 hours without session activity.
+## In the menu
 
-Keep the topic private: anyone who knows it can read and send alerts. The conversation name and duration are sent to ntfy and may appear on your lock screen.
+- See monitoring status, active task count and the last accepted notification.
+- Pause alerts for an hour; change the duration threshold, flash and title privacy.
+- Group completions and set quiet hours. Terminal failures get a distinct alert.
+- Keep tasks awake on power or battery while the screen turns off. Keep the lid open and Internet connected; protection expires after 2 hours without session activity.
 
-**Uninstall:** run `bash install.command uninstall` from the downloaded folder.
+## Approval alerts
 
-[MIT license](LICENSE) · [Privacy](PRIVACY.md)
+Optional [Codex hooks](docs/APPROVALS.md) notify you when approval was requested. They require a separate review and trust step in Codex, and never approve anything automatically.
+
+Keep your ntfy topic private: anyone who knows it can read and send alerts. Task names can appear on your lock screen.
+
+[Source install & commands](docs/USAGE.md) · [Build the app](docs/BUILDING.md) · [Privacy](PRIVACY.md) · [MIT](LICENSE)

@@ -62,7 +62,7 @@ def _anchor(stream: Any, offset: int) -> str:
 
 
 class Watcher:
-    """Incremental watcher for top-level task completions strictly over a limit.
+    """Incremental watcher for top-level completions and terminal failures.
 
     Unchanged files are only stat'ed. Initially, untouched files older than 48
     hours are baselined without opening them. Changed files are streamed with a
@@ -93,7 +93,7 @@ class Watcher:
         self._present_files: set[str] = set()
 
     def poll(self) -> list[dict]:
-        """Return each eligible completion once, including across saved restarts."""
+        """Return each eligible completion/failure once across saved restarts."""
         records: list[dict] = []
         now = time.time()
         recent_cutoff = now - RECENT_FILE_SECONDS
@@ -149,12 +149,17 @@ class Watcher:
             if duration is None:
                 start = record.get("started_at", start)
                 if start is None:
-                    continue
-                duration = completed_at - start
-            if duration <= self.min_seconds:
+                    if not record.get("failed"):
+                        continue
+                    duration = 0
+                else:
+                    duration = max(0, completed_at - start)
+            failed = record.get("failed", False)
+            if not failed and duration <= self.min_seconds:
                 continue
             alerts.append({
                 "id": identity,
+                "kind": "failed" if failed else "completed",
                 "thread_id": record["thread_id"],
                 "turn_id": record["turn_id"],
                 "seconds": duration,
@@ -165,6 +170,13 @@ class Watcher:
     def has_active_tasks(self, now: float | None = None) -> bool:
         """Whether a current top-level turn warrants preventing idle sleep.
 
+        Uses the same definition as ``active_task_count``.
+        """
+        return self.active_task_count(now) > 0
+
+    def active_task_count(self, now: float | None = None) -> int:
+        """Count current top-level turns that warrant preventing idle sleep.
+
         Call after ``poll``. The newest lifecycle event in each thread must
         belong to an unfinished turn with activity in the last two hours.
         Completed, aborted, deleted, future-dated and stale sessions do not
@@ -173,7 +185,7 @@ class Watcher:
         """
         now = time.time() if now is None else _number(now)
         if now is None:
-            return False
+            return 0
         threads: dict[str, dict] = {}
         for path in self._present_files:
             cursor = self.files.get(path, {})
@@ -193,6 +205,7 @@ class Watcher:
             if (thread["latest"] is None
                     or self._task_order(latest) > self._task_order(thread["latest"])):
                 thread["latest"] = latest
+        active = 0
         for thread in threads.values():
             if thread["latest"] is None:
                 continue
@@ -200,8 +213,8 @@ class Watcher:
             if (start is not None and start <= now
                     and start <= thread["activity"]
                     and now - thread["activity"] <= ACTIVE_TASK_IDLE_SECONDS):
-                return True
-        return False
+                active += 1
+        return active
 
     @staticmethod
     def _task_order(record: dict) -> tuple:
@@ -316,6 +329,14 @@ class Watcher:
             "turn_id": turn_id,
             "time": timestamp,
         }
+        # Desktop rollouts explicitly attach ErrorEvent data to a terminal
+        # task_complete. Tool failures and prose are not terminal task errors.
+        # Keep only this boolean: error messages may contain private details.
+        error = payload.get("error")
+        if (kind == "task_complete" and isinstance(error, dict)
+                and isinstance(error.get("message"), str)
+                and error["message"].strip()):
+            result["failed"] = True
         started_at = _timestamp(payload.get("started_at"))
         if started_at is not None:
             result["started_at"] = started_at

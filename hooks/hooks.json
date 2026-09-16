@@ -1,0 +1,17 @@
+{
+  "description": "Optional approval alerts. Review and trust these hooks in Codex. They never grant or deny requests.",
+  "hooks": {
+    "PermissionRequest": [
+      {"hooks": [{"type": "command", "command": "/bin/sh \"$PLUGIN_ROOT/scripts/codex-alert-hook.sh\" PermissionRequest", "timeout": 3}]}
+    ],
+    "PostToolUse": [
+      {"hooks": [{"type": "command", "command": "/bin/sh \"$PLUGIN_ROOT/scripts/codex-alert-hook.sh\" PostToolUse", "timeout": 3}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "/bin/sh \"$PLUGIN_ROOT/scripts/codex-alert-hook.sh\" Stop", "timeout": 3}]}
+    ],
+    "Interrupt": [
+      {"hooks": [{"type": "command", "command": "/bin/sh \"$PLUGIN_ROOT/scripts/codex-alert-hook.sh\" Interrupt", "timeout": 3}]}
+    ]
+  }
+}

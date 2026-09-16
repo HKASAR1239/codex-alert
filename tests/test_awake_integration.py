@@ -20,7 +20,7 @@ class AwakeIntegrationTests(unittest.TestCase):
         self.home = Path(temporary.name)
         self.phone = {"provider": "ntfy", "topic": "codex-" + "a" * 32}
         self.config = dict(alert.DEFAULT_CONFIG, phone=self.phone, flash=False,
-                           keep_awake="always", poll_seconds=60)
+                           keep_awake="always", poll_seconds=60, group_seconds=0)
         alert.save_json(self.home / "config.json", self.config)
 
     def test_last_notification_is_attempted_before_releasing_power(self):
@@ -35,6 +35,7 @@ class AwakeIntegrationTests(unittest.TestCase):
 
         power.update.side_effect = update
         monitor = mock.Mock()
+        monitor.active_task_count.side_effect = [1, 0]
         monitor.poll.side_effect = [[], [{"thread_id": "synthetic", "seconds": 125}]]
         monitor.has_active_tasks.side_effect = [True, False]
 
@@ -61,6 +62,7 @@ class AwakeIntegrationTests(unittest.TestCase):
     def test_watcher_error_and_exit_release_assertion(self):
         power = mock.Mock(active=False)
         monitor = mock.Mock()
+        monitor.active_task_count.return_value = 0
         monitor.poll.side_effect = [RuntimeError("synthetic failure"), KeyboardInterrupt]
         with mock.patch.object(alert, "Watcher", return_value=monitor), \
                 mock.patch.object(alert, "KeepAwake", return_value=power), \
@@ -87,6 +89,7 @@ class AwakeIntegrationTests(unittest.TestCase):
         power = mock.Mock(active=True)
         power.update.side_effect = lambda *_: setattr(power, "active", False)
         monitor = mock.Mock()
+        monitor.active_task_count.return_value = 0
         monitor.poll.return_value = []
         monitor.has_active_tasks.return_value = False
 

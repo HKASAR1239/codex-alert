@@ -66,6 +66,51 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(self.watcher.poll(), [])
         self.assertNotIn("thread:turn", self.state["started"])
 
+    def test_terminal_error_alerts_even_when_task_is_short(self):
+        self.write(meta(), event("task_started", timestamp=1900),
+                   self.complete(duration_ms=1000, error={
+                       "message": "private error details", "codex_error_info": "Other"}))
+        alert = self.watcher.poll()[0]
+        self.assertEqual(alert["kind"], "failed")
+        self.assertEqual(alert["seconds"], 1)
+        self.assertNotIn("private error details", json.dumps(self.state))
+        self.assertNotIn("private error details", json.dumps(alert))
+        self.assertEqual(self.watcher.poll(), [])
+        self.assertFalse(self.watcher.has_active_tasks(2000))
+
+    def test_terminal_error_without_duration_or_start_still_alerts(self):
+        self.write(meta(), event("task_complete", error={"message": "private details"}))
+        alert = self.watcher.poll()[0]
+        self.assertEqual(alert["kind"], "failed")
+        self.assertEqual(alert["seconds"], 0)
+
+    def test_unrecognized_empty_error_fields_do_not_make_failure(self):
+        for error in (None, False, "error prose", {}, {"message": " "}, {"message": False}):
+            with self.subTest(error=error):
+                turn = repr(error)
+                self.write(meta(), self.complete(turn=turn, error=error))
+                self.assertEqual(self.watcher.poll()[0]["kind"], "completed")
+
+    def test_intermediate_tool_errors_and_agent_prose_are_not_task_failures(self):
+        self.write(meta(), event("task_started", timestamp=1900),
+                   event("error", error={"message": "retryable error"}),
+                   event("agent_message", message="This failed; approval required."),
+                   event("item_completed", item={"status": "failed"}))
+        self.assertEqual(self.watcher.poll(), [])
+        self.assertTrue(self.watcher.has_active_tasks(2000))
+        self.append(self.complete(timestamp=2100))
+        self.assertEqual(self.watcher.poll()[0]["kind"], "completed")
+
+    def test_historical_subagent_and_aborted_errors_do_not_alert(self):
+        error = {"message": "private details"}
+        self.write(meta(), self.complete("old", timestamp=999, error=error),
+                   event("task_started", "cancelled", timestamp=1800),
+                   event("turn_aborted", "cancelled", timestamp=1900, error=error),
+                   self.complete("cancelled", timestamp=2000, error=error))
+        self.write(meta("child", {"subagent": {}}), self.complete(error=error),
+                   path=self.root / "child.jsonl")
+        self.assertEqual(self.watcher.poll(), [])
+
     def test_duplicate_across_files_and_json_restart(self):
         content = (meta(), self.complete())
         self.write(*content)
@@ -201,12 +246,25 @@ class WatcherTests(unittest.TestCase):
         self.write(meta("thread-a"), event("task_started", timestamp=2000))
         self.write(meta("thread-b"), event("task_started", timestamp=2000), path=second)
         self.poll_at(2000)
+        self.assertEqual(self.watcher.active_task_count(2000), 2)
         self.append(event("task_complete", timestamp=2200))
         self.poll_at(2200)
+        self.assertEqual(self.watcher.active_task_count(2200), 1)
         self.assertTrue(self.watcher.has_active_tasks(2200))
         self.append(event("turn_aborted", timestamp=2201), path=second)
         self.poll_at(2201)
+        self.assertEqual(self.watcher.active_task_count(2201), 0)
         self.assertFalse(self.watcher.has_active_tasks(2201))
+
+    def test_active_count_counts_threads_once_across_rotation_and_replays(self):
+        self.write(meta(), event("task_started", "old", timestamp=1900),
+                   event("task_started", timestamp=2000))
+        self.write(meta(), event("task_started", timestamp=2000),
+                   path=self.root / "copy.jsonl")
+        self.poll_at(2000)
+        self.assertEqual(self.watcher.active_task_count(2000), 1)
+        self.assertEqual(self.watcher.active_task_count(2000 + watcher_module.ACTIVE_TASK_IDLE_SECONDS + 1), 0)
+        self.assertEqual(self.watcher.active_task_count(float("nan")), 0)
 
     def test_newer_completed_turn_does_not_revive_abandoned_start(self):
         self.write(meta(), event("task_started", "abandoned", timestamp=2000),

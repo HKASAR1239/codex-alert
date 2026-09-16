@@ -38,6 +38,8 @@ class InstallerTests(unittest.TestCase):
         self.events = []
         self.config = {
             "min_seconds": 180, "poll_seconds": 7, "flash": False,
+            "group_seconds": 10, "paused_until": 0, "discard_before": 0,
+            "quiet_hours": {"enabled": False, "start": "22:00", "end": "08:00"},
             "phone": {"provider": "ntfy", "topic": "codex-" + "c" * 32},
         }
         patches = {

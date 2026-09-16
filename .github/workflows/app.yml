@@ -1,0 +1,67 @@
+name: macOS app
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+            python-architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+            python-architecture: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.python-architecture }}
+      - name: Install isolated build dependencies
+        run: |
+          python -m venv work/build-venv
+          work/build-venv/bin/python -m pip install --disable-pip-version-check -r scripts/requirements-build.txt
+      - name: Test source
+        run: python -m unittest discover -s tests -v
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: '1'
+      - name: Build, sign and verify app
+        run: work/build-venv/bin/python scripts/build_app.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-alert-macos-${{ matrix.architecture }}
+          path: |
+            work/dist/*.zip
+            work/dist/*.sha256
+            work/dist/*.json
+          if-no-files-found: error
+  release-assets:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: codex-alert-macos-*
+          path: release-assets
+          merge-multiple: true
+      - name: Attach verified builds to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --draft --title "Codex Alert $RELEASE_TAG" --notes "Self-contained macOS app builds. See README for setup and signing status."
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber

@@ -193,7 +193,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Install or manage Codex Alert for the current macOS user.')
     parser.add_argument('command', nargs='?', default='setup',
                         choices=['setup', 'status', 'test-flash', 'test-phone',
-                                 'configure-phone', 'phone-off', 'power-mode', 'uninstall'])
+                                 'configure-phone', 'phone-off', 'power-mode', 'uninstall',
+                                 'settings', 'pause', 'resume'])
+    parser.add_argument('--set', dest='settings', action='append', default=[])
+    parser.add_argument('--minutes', type=float, default=60)
     parser.add_argument('--mode', choices=['off', 'plugged_in', 'always'],
                         help='Use with power-mode to select idle-sleep prevention.')
     parser.add_argument('--local-only', action='store_true', help='Enable Mac alerts without phone notifications.')
@@ -227,6 +230,11 @@ def main(argv=None):
             print('To erase saved settings and state, delete that folder manually after uninstalling.')
         else:
             extra = ['--mode', args.mode] if args.command == 'power-mode' else []
+            if args.command == 'settings':
+                for pair in args.settings:
+                    extra.extend(['--set', pair])
+            elif args.command == 'pause':
+                extra.extend(['--minutes', str(args.minutes)])
             return alert_main(['--home', str(home), *extra, args.command])
         return 0
     except KeyboardInterrupt:
