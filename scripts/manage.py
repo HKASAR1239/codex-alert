@@ -193,12 +193,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Install or manage Codex Alert for the current macOS user.')
     parser.add_argument('command', nargs='?', default='setup',
                         choices=['setup', 'status', 'test-flash', 'test-phone',
-                                 'configure-phone', 'phone-off', 'uninstall'])
+                                 'configure-phone', 'phone-off', 'power-mode', 'uninstall'])
+    parser.add_argument('--mode', choices=['off', 'plugged_in', 'always'],
+                        help='Use with power-mode to select idle-sleep prevention.')
     parser.add_argument('--local-only', action='store_true', help='Enable Mac alerts without phone notifications.')
     parser.add_argument('--no-flash', action='store_true', help='Disable the Mac screen-edge pulses.')
     parser.add_argument('--min-seconds', type=float, help='Notify only after turns strictly longer than this duration.')
     parser.add_argument('--check', action='store_true', help='Check prerequisites without writing files or starting services.')
     args = parser.parse_args(argv)
+    if (args.command == 'power-mode') != (args.mode is not None):
+        parser.error('Use power-mode with --mode off, plugged_in or always.')
     try:
         if args.min_seconds is not None and not 0 <= args.min_seconds <= 86400:
             raise ValueError('--min-seconds must be between 0 and 86400.')
@@ -222,7 +226,8 @@ def main(argv=None):
             print('Alerts stopped and login startup removed. Local settings are kept in ~/Library/Application Support/CodexAlert.')
             print('To erase saved settings and state, delete that folder manually after uninstalling.')
         else:
-            return alert_main(['--home', str(home), args.command])
+            extra = ['--mode', args.mode] if args.command == 'power-mode' else []
+            return alert_main(['--home', str(home), *extra, args.command])
         return 0
     except KeyboardInterrupt:
         print('\nSetup cancelled.', file=sys.stderr)

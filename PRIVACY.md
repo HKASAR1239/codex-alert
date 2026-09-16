@@ -10,6 +10,12 @@ Application files, notification settings, state and operational logs live in `~/
 
 Logs contain operational status and delivery attempts, not session text or the ntfy topic. Diagnostic `status` output does not display the topic. Do not publish your configuration, state, session files or unreviewed logs in an issue.
 
+## Screen-off operation
+
+During detected active tasks, the companion uses macOS `caffeinate -i` to prevent idle system sleep while allowing the screen to turn off or lock. It does not change your global energy settings. The default `plugged_in` mode only applies on external power; `bash install.command power-mode --mode always` also allows battery use, which consumes additional energy. Use `--mode off` to disable it.
+
+Protection is released after the task's completion notification is attempted, on interruption, or after 2 hours without session activity. Activity resumes protection. This inactivity limit avoids keeping the Mac awake indefinitely after an abandoned task, but a command that produces no Codex session activity for over 2 hours can lose protection. Assertions have a short renewable timeout and are tied to the watcher process, so they also expire if it stops or hangs. Closing the lid, choosing Sleep, powering off or losing network access is not handled by this mode.
+
 ## Phone notifications
 
 Phone setup creates a random topic with 128 bits of randomness on `https://ntfy.sh`. No phone number, account or API key is requested. The topic is displayed in your own interactive terminal so you can subscribe on your phone; do not paste it into chats, screenshots or issue reports.

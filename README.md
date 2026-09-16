@@ -14,7 +14,9 @@ Requires **macOS 13+, Python 3.9+ and Xcode Command Line Tools** (`xcode-select 
 3. Double-click **`install.command`** on your Mac.
 4. In ntfy, subscribe to the topic shown by the installer on **`https://ntfy.sh`**. Press Return on your Mac to send a test.
 
-Keep your Mac awake and online. Keep the topic private: anyone who knows it can read and send alerts. The conversation name and duration are sent to ntfy and may appear on your lock screen.
+The screen can turn off or lock: Codex Alert prevents idle sleep during detected tasks while plugged in. For battery use too: `bash install.command power-mode --mode always` (uses more battery). Disable with `--mode off`. Keep the Mac online and its lid open; manual sleep and shutdown suspend local tasks. Protection ends after completion or 2 hours without session activity.
+
+Keep the topic private: anyone who knows it can read and send alerts. The conversation name and duration are sent to ntfy and may appear on your lock screen.
 
 **Uninstall:** run `bash install.command uninstall` from the downloaded folder.
 

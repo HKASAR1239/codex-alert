@@ -99,7 +99,7 @@ class InstallerTests(unittest.TestCase):
         manage.install(self.home, self.plist, self.args)
         self.assertEqual(self.events, ["compile", "stop", "start"])
         self.assertEqual(json.loads((self.home / "config.json").read_text()),
-                         dict(self.config, include_task_name=True))
+                         dict(self.config, include_task_name=True, keep_awake="plugged_in"))
         self.assertEqual((self.home / "bin/codex-flash").read_text(), "compiled helper\n")
         self.assertTrue((self.home / "app/codex_alert/__init__.py").exists())
         self.assertFalse((self.home / "app/old-app-marker").exists())
@@ -109,7 +109,21 @@ class InstallerTests(unittest.TestCase):
         self.config["include_task_name"] = False
         self.existing_installation()
         manage.install(self.home, self.plist, self.args)
+        self.assertEqual(json.loads((self.home / "config.json").read_text()),
+                         dict(self.config, keep_awake="plugged_in"))
+
+    def test_upgrade_preserves_battery_power_mode(self):
+        self.config.update(include_task_name=True, keep_awake="always")
+        self.existing_installation()
+        manage.install(self.home, self.plist, self.args)
         self.assertEqual(json.loads((self.home / "config.json").read_text()), self.config)
+
+    def test_power_mode_command_forwards_mode_without_reinstalling(self):
+        with mock.patch.object(manage, "alert_main", return_value=0) as alert_main:
+            self.assertEqual(manage.main(["power-mode", "--mode", "always"]), 0)
+        alert_main.assert_called_once_with(["--home", str(self.home), "--mode", "always", "power-mode"])
+        manage.stop.assert_not_called()
+        manage.start.assert_not_called()
 
     def test_failed_compile_does_not_stop_or_change_existing_installation(self):
         old_config, old_plist = self.existing_installation()

@@ -17,11 +17,13 @@ import subprocess
 import sys
 import tempfile
 import time
+from typing import Callable
 import urllib.error
 import urllib.request
 
 from .watcher import Watcher
 from .titles import TitleResolver, sanitize_title
+from .power import KeepAwake
 
 
 DEFAULT_HOME = Path.home() / "Library/Application Support/CodexAlert"
@@ -30,6 +32,7 @@ DEFAULT_CONFIG = {
     "poll_seconds": 3,
     "flash": True,
     "include_task_name": True,
+    "keep_awake": "plugged_in",
     "phone": {"provider": "none"},
 }
 NTFY_SERVER = "https://ntfy.sh"
@@ -100,6 +103,9 @@ def config_for(home: Path, *, reset_invalid_phone: bool = False) -> dict:
     config["include_task_name"] = raw.get("include_task_name", True)
     if not isinstance(config["include_task_name"], bool):
         raise AlertError("Invalid configuration field: include_task_name")
+    config["keep_awake"] = raw.get("keep_awake", "plugged_in")
+    if config["keep_awake"] not in ("off", "plugged_in", "always"):
+        raise AlertError("Invalid configuration field: keep_awake")
     try:
         config["phone"] = clean_phone(raw.get("phone", {"provider": "none"}))
     except AlertError:
@@ -185,10 +191,13 @@ def flash(home: Path) -> None:
                    timeout=10, check=True)
 
 
-def drain(home: Path, state: dict, config: dict, titles: TitleResolver | None = None) -> None:
+def drain(home: Path, state: dict, config: dict, titles: TitleResolver | None = None,
+          refresh: Callable[[], None] | None = None) -> None:
     pending = state.setdefault("pending", [])
     destination = destination_id(config["phone"])
     for item in list(pending):
+        if refresh is not None:
+            refresh()
         if not item.get("local_done"):
             # At most once: a crash after this save may skip the visual alert.
             item["local_done"] = True
@@ -244,21 +253,49 @@ def watch(home: Path, sessions: Path) -> None:
         titles = TitleResolver(sessions.parent)
         save_json(home / "state.json", state)
         logging.info("Watcher started.")
-        while True:
-            try:
-                config = config_for(home)
-                monitor.min_seconds = config["min_seconds"]
-                enqueue(state, monitor.poll(), config)
-                state["heartbeat_at"] = time.time()
-                save_json(home / "state.json", state)
-                drain(home, state, config, titles)
-                time.sleep(config["poll_seconds"])
-            except KeyboardInterrupt:
-                break
-            except Exception:
-                # Never log exception text, config, requests or session records.
-                logging.error("Watcher paused after a local error; retrying in 10 seconds.")
-                time.sleep(10)
+        power = KeepAwake()
+        try:
+            while True:
+                try:
+                    config = config_for(home)
+                    monitor.min_seconds = config["min_seconds"]
+                    enqueue(state, monitor.poll(), config)
+                    active = monitor.has_active_tasks()
+                    if active or config["keep_awake"] == "off":
+                        power.update(active, config["keep_awake"])
+                    state["heartbeat_at"] = time.time()
+                    state["keep_awake_active"] = power.active
+                    save_json(home / "state.json", state)
+                    # Hold the previous assertion through the last notification.
+                    hold = active or power.active
+                    drain(home, state, config, titles,
+                          refresh=lambda: power.update(hold, config["keep_awake"]))
+                    power.update(active, config["keep_awake"])
+                    if state["keep_awake_active"] != power.active:
+                        state["keep_awake_active"] = power.active
+                        save_json(home / "state.json", state)
+                    # Renew short assertions even with a slower custom poll rate.
+                    interval = config["poll_seconds"]
+                    if config["keep_awake"] != "off":
+                        interval = min(interval, 15)
+                    time.sleep(interval)
+                except KeyboardInterrupt:
+                    break
+                except Exception:
+                    power.close()
+                    try:
+                        # Only change the saved power status: an interrupted poll
+                        # may have uncommitted cursors in the in-memory state.
+                        saved = read_json(home / "state.json", {})
+                        saved["keep_awake_active"] = False
+                        save_json(home / "state.json", saved)
+                    except Exception:
+                        pass
+                    # Never log exception text, config, requests or session records.
+                    logging.error("Watcher paused after a local error; retrying in 10 seconds.")
+                    time.sleep(10)
+        finally:
+            power.close()
 
 
 def configure_phone(home: Path) -> None:
@@ -301,11 +338,14 @@ def status_for(home: Path, sessions: Path) -> dict:
     config = config_for(home)
     state = read_json(home / "state.json", {})
     age = time.time() - state.get("heartbeat_at", 0)
+    running = watcher_running(home) and 0 <= age < 60
     return {
-        "watcher": "active" if watcher_running(home) and 0 <= age < 60 else "inactive or waiting",
+        "watcher": "active" if running else "inactive or waiting",
         "min_seconds": config["min_seconds"],
         "flash": config["flash"],
         "include_task_name": config["include_task_name"],
+        "keep_awake": config["keep_awake"],
+        "keep_awake_active": running and bool(state.get("keep_awake_active", False)),
         "phone": config["phone"]["provider"],
         "pending_alerts": len(state.get("pending", [])),
         "sessions_available": sessions.is_dir(),
@@ -318,9 +358,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--home", type=Path, default=DEFAULT_HOME, help="Private runtime directory")
     parser.add_argument("--sessions", type=Path, default=default_sessions(), help="Codex sessions directory")
     parser.add_argument("--json", action="store_true", help="Print status as JSON")
+    parser.add_argument("--mode", choices=["off", "plugged_in", "always"],
+                        help="Idle-sleep prevention mode for power-mode")
     parser.add_argument("command", choices=["watch", "status", "test-flash", "test-phone",
-                                           "configure-phone", "phone-off"])
+                                           "configure-phone", "phone-off", "power-mode"])
     args = parser.parse_args(argv)
+    if (args.command == "power-mode") != (args.mode is not None):
+        parser.error("Use power-mode with --mode off, plugged_in or always.")
     home, sessions = args.home.expanduser().resolve(), args.sessions.expanduser().resolve()
     try:
         if args.command == "watch":
@@ -335,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("Mac flash: " + ("on" if status["flash"] else "off"))
                 print("Phone: " + status["phone"])
                 print("Task names: " + ("on" if status["include_task_name"] else "off"))
+                print("Keep awake: " + status["keep_awake"] +
+                      (" (active)" if status["keep_awake_active"] else " (idle)"))
                 print("Pending alerts: " + str(status["pending_alerts"]))
                 if not status["sessions_available"]:
                     print("No Codex sessions directory yet; run a Codex task first.")
@@ -345,6 +391,11 @@ def main(argv: list[str] | None = None) -> int:
             if not send_phone(config_for(home)["phone"], TEST_MESSAGE):
                 raise AlertError("Phone is not configured. Run install.command configure-phone first.")
             print("Test accepted by ntfy. Check your phone for delivery.")
+        elif args.command == "power-mode":
+            config = config_for(home)
+            config["keep_awake"] = args.mode
+            save_json(home / "config.json", config)
+            print("Keep-awake mode: " + args.mode + ". The watcher will apply it automatically.")
         elif args.command == "phone-off":
             config = config_for(home, reset_invalid_phone=True)
             config["phone"] = {"provider": "none"}
